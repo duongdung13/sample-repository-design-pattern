@@ -7,58 +7,140 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
-## About Laravel
+#Sample Repository Design Pattern
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Giới thiệu
+Đi qua một chút về lí thuyết, để có 1 cái nhìn tổng quan hơn về Repository đã nhé
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- Repository Pattern là lớp trung gian giữa tầng Business Logic và Data Access, giúp cho việc truy cập dữ liệu chặt chẽ và bảo mật hơn.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- Repository đóng vai trò là một lớp kết nối giữa tầng Business và Model của ứng dụng.
 
-## Learning Laravel
+Thông thường thì các phần truy xuất, giao tiếp với database năm rải rác ở trong code, khi bạn muốn thực hiện một thao tác lên database thì phải tìm trong code cũng như tìm các thuộc tính trong bảng để xử lý. Điều này gây lãng phí thời gian và công sức rất nhiều.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+Với Repository design pattern, thì việc thay đổi ở code sẽ không ảnh hưởng quá nhiều công sức chúng ra chỉnh sửa.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains over 1500 video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Một số lý do chung ta nên sử dụng Repository Pattern:
 
-## Laravel Sponsors
+- Một nơi duy nhất để thay đổi quyền truy cập dữ liệu cũng như xử lý dữ liệu.
+- Một nơi duy nhất chịu trách nhiệm cho việc mapping các bảng vào object.
+- Tăng tính bảo mật và rõ ràng cho code.
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the Laravel [Patreon page](https://patreon.com/taylorotwell).
+Rất dễ dàng để thay thế một Repository với một implementation giả cho việc testing, vì vậy bạn không cần chuẩn bị một cơ sở dữ liệu có sẵn.
 
-### Premium Partners
+## Thiết kế riêng lẻ từng repository cho từng Model
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Cubet Techno Labs](https://cubettech.com)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[Many](https://www.many.co.uk)**
-- **[Webdock, Fast VPS Hosting](https://www.webdock.io/en)**
-- **[DevSquad](https://devsquad.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[OP.GG](https://op.gg)**
-- **[WebReinvent](https://webreinvent.com/?utm_source=laravel&utm_medium=github&utm_campaign=patreon-sponsors)**
-- **[Lendio](https://lendio.com)**
+Bạn hãy xem 1 đoạn code viết theo phong cách hiện tại
 
-## Contributing
+```
+/**
+ * @param $id
+ * @return \Illuminate\Contracts\Foundation\Application|\Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
+ */
+public function edit($id)
+{
+    $user = User::finOrFail($id);
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+    return view('admin.user.edit', compact('user'));
+}
+```
 
-## Code of Conduct
+Một đoạn code rất quen thuộc trong việc CRUD User được thực hiện trong controler UserController đúng không nào. Việc của chúng ta là phải triển khai việc tách phần truy xuất cũng như giao tiếp với database ở đây cụ thể là Model User.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Trước tiên ta tạo một thư mục nằm trong thư mục app của ứng dụng Laravel của bạn với tên là Repositories. Nhìn qua qua thì ta có thể hình dung thư mục này cùng cấp thư mục Http của app. Như tiêu đề của chỉ mục ta sẽ thiết kế tiếp 1 thư mục con ứng với mỗi Model- ở đây cụ thể là User. Trong thư mục User này ta thiết kế 2 file có tên là UserRepository.php và UserRepositoryInterface.php
 
-## Security Vulnerabilities
+Đây đại loại là cấu trúc như vậy.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+<img style="width: 400px" src="https://i.imgur.com/sOd6ig1.png" />
 
-## License
+Việc tiếp theo là xử lí file `UserRepository.php`
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```
+<?php
+
+namespace App\Repositories\User;
+
+use App\Models\User;
+
+class UserRepository implements UserRepositoryInterface
+{
+    /**
+     * @param $id
+     * @return mixed
+     */
+    public function findById($id)
+    {
+        return User::findOrFail($id);
+    }
+}
+```
+
+Bên file `UserRepositoryInterface.php` sẽ xử lí như sau
+```
+<?php
+
+namespace App\Repositories\User;
+
+interface UserRepositoryInterface
+{
+    public function findById($id);
+}
+```
+
+Sửa lại UserController một chút nào
+```
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Repositories\User\UserRepositoryInterface;
+
+class UserController extends Controller
+{
+    protected $userRepository;
+
+    public function __construct(UserRepositoryInterface $userRepository)
+    {
+        $this->userRepository = $userRepository;
+    }
+
+    /**
+     * @param $id
+     * @return \Illuminate\Contracts\Foundation\Application|\Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
+     */
+    public function edit($id)
+    {
+        $user = $this->userRepository->findById($id);
+
+        return view('admin.user.edit', compact('user'));
+    }
+}
+```
+
+Ở đây mình inject class `UserRepositoryInterface` vào `UserController` rồi gọi hàm `findById($id)` ra, vì vậy để code chạy được việc tiếp theo là phải `bind UserRepositoryInterface` vào Container sử dụng `UserRepository` trong đó.
+
+Ta tìm đến file `AppServiceProvider.php` làm việc này trong function `register()`.
+
+```
+<?php
+
+namespace App\Providers;
+
+use App\Repositories\User\UserRepository;
+use App\Repositories\User\UserRepositoryInterface;
+use Illuminate\Support\ServiceProvider;
+
+class AppServiceProvider extends ServiceProvider
+{
+    /**
+     * Register any application services.
+     *
+     * @return void
+     */
+    public function register()
+    {
+        $this->app->singleton(UserRepositoryInterface::class, UserRepository::class);
+    }
+```
+
+Các bạn xem code tại branch : [feature/create-user-repository](https://github.com/duongdung13/sample-repository-design-pattern/tree/feature/create-user-repository)
